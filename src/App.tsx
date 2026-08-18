@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { RotateCcw, Trophy } from 'lucide-react'
+import { RotateCcw, Trophy, Volume2, VolumeX } from 'lucide-react'
 import { agents, createRoundQuestions, decoyChoices, providers, providerDecoyChoices, sounds, type Agent, type Choice, type Question } from './game-data'
 import introVideo from '../video/intro.mp4'
 import introMusic from '../sounds/intro.mp3'
@@ -58,30 +58,51 @@ function Logo() {
   </h1>
 }*/
 
+/** Interruptor de desarrollo: pon esto en `false` para desactivar el audio de intro.mp3
+ *  (portada y partida) y el audio propio del video intro.mp4, sin borrar los archivos. */
+const INTRO_AUDIO_ENABLED = false
+
 const HOME_AUDIO_CYCLE_MS = 3 * 60 * 1000
 
 function HomeBackground() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const ambientRef = useRef<HTMLAudioElement>(null)
+  const [silenced, setSilenced] = useState(false)
+  const silencedRef = useRef(false)
+  const applyMuteRef = useRef(() => {})
+
+  useEffect(() => {
+    silencedRef.current = silenced
+    applyMuteRef.current()
+  }, [silenced])
 
   useEffect(() => {
     const video = videoRef.current
     const ambient = ambientRef.current
     if (!video || !ambient) return
     let videoAudioTimeout: number
+    let phase: 'video' | 'ambient' = 'video'
 
     // Ambos elementos siempre están reproduciéndose (arrancan silenciados, lo que el navegador
     // permite sin gesto del usuario); solo se alterna `muted` para pasar el sonido de uno a otro,
     // ya que silenciar/activar un medio que ya está en reproducción no requiere interacción previa.
+    // El botón de silencio manual se superpone a ese ciclo sin detenerlo.
+    function applyMuteState() {
+      if (!INTRO_AUDIO_ENABLED || silencedRef.current) { video!.muted = true; ambient!.muted = true; return }
+      video!.muted = phase !== 'video'
+      ambient!.muted = phase !== 'ambient'
+    }
+    applyMuteRef.current = applyMuteState
+
     function playAmbient() {
-      video!.muted = true
-      ambient!.muted = false
+      phase = 'ambient'
+      applyMuteState()
     }
 
     function playVideoAudio() {
-      ambient!.muted = true
+      phase = 'video'
       video!.currentTime = 0
-      video!.muted = false
+      applyMuteState()
       const duration = Number.isFinite(video!.duration) && video!.duration > 0 ? video!.duration : 10
       window.clearTimeout(videoAudioTimeout)
       videoAudioTimeout = window.setTimeout(playAmbient, duration * 1000)
@@ -105,6 +126,14 @@ function HomeBackground() {
   return <>
     <video ref={videoRef} className="home-media" src={introVideo} autoPlay muted loop playsInline aria-hidden="true" />
     <audio ref={ambientRef} src={introMusic} autoPlay muted loop preload="auto" />
+    {INTRO_AUDIO_ENABLED && <button
+      type="button"
+      onClick={() => setSilenced((value) => !value)}
+      aria-label={silenced ? 'Activar música de fondo' : 'Silenciar música de fondo'}
+      className="absolute right-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm"
+    >
+      {silenced ? <VolumeX size={22} /> : <Volume2 size={22} />}
+    </button>}
   </>
 }
 
@@ -149,6 +178,7 @@ export default function App() {
   const finalMessage = useMemo(() => score < 3 ? 'Ánimo, en la siguiente partida lo harás mejor' : score < 5 ? '¡Eres genial!' : '¡Eres increíble, con todo!', [score])
 
   function startBackgroundMusic() {
+    if (!INTRO_AUDIO_ENABLED) return
     const music = backgroundMusicRef.current
     if (!music) return
     music.volume = .7
