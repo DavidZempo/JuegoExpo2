@@ -160,7 +160,21 @@ function createChoices(pool: Agent[], decoys: Choice[]): Choice[] {
 function poolFor(mode: Mode) { return mode === 'agents' ? agents : providers }
 function decoysFor(mode: Mode) { return mode === 'agents' ? decoyChoices : providerDecoyChoices }
 
+/** Fuerza la descarga de imágenes y video al abrir la app para que el navegador los sirva
+ *  desde caché el resto de la sesión, en vez de volver a pedirlos cada vez que se muestran. */
+function preloadAssets() {
+  const imagePaths = [
+    ...agents.map((agent) => agent.image),
+    ...providers.map((provider) => provider.image),
+    '/logo/Neto-Logo-Blanco-2.png',
+    '/images/fondo.jpg',
+  ]
+  imagePaths.filter(Boolean).forEach((src) => { const img = new Image(); img.src = src })
+  fetch(introVideo).catch(() => undefined)
+}
+
 export default function App() {
+  useEffect(() => { preloadAssets() }, [])
   const [screen, setScreen] = useState<Screen>('home')
   const [mode, setMode] = useState<Mode>('agents')
   const [rounds, setRounds] = useState<Question[]>(() => createRoundQuestions(poolFor('agents')))
